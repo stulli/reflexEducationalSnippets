@@ -7,6 +7,7 @@ import Reflex.Dom.Xhr (performRequestAsync, xhrRequest, XhrResponse (..), XhrReq
 import Reflex.Class (tag, constant, mergeList, appendEvents, leftmost)
 import Reflex.Dynamic (updated, tagDyn)
 import qualified Data.List.NonEmpty as NE
+import Data.Char (toUpper)
 import qualified Data.Text as T
 import Data.Default (def)
 
@@ -42,27 +43,39 @@ row number = do
         return $ fmap (\v -> "i am ev " ++ show number ++ "!!!") eBtn  -- attach a string to the button event
     return ev1
 
---example 3
+-- example 3
+-- What this snippet does:
+-- 1. Get data (a list of strings) via Ajax request (mocked)
+-- 2. Dynamically create a list where each item
+--    - is labelled with data from the data request 
+--    - has a button that returns data based on the label
+-- 3. Clicks on the buttons of the list items will change the result div
 nestedButtonsWithEvents :: MonadWidget t m => String -> m ()
 nestedButtonsWithEvents heading = do
     el "div" $ text heading
+    -- click on the main button fetches some data
     asyncEvent <- button "main"
     resultEvent <- getDataFromServerMock asyncEvent
+    -- create list
     listDyn <- holdDyn [] resultEvent
     listElements <- el "div" $ do
         simpleList listDyn mkChild
-    changeEvent <- mapDyn leftmost listElements
-    let finalEvent = switch $ current changeEvent
+    -- simply take the first event from the list
+    iAmStillADynamic <- mapDyn leftmost listElements
+    -- here we extract the event from the dynamic
+    let finalEvent = switch $ current iAmStillADynamic
+    -- after extracting another dynamic is created
+    -- (seems like this can somehow be optimized)
     finalDynamic <- holdDyn "init" finalEvent
     el "div" $ dynText finalDynamic
-    el "br" $ return ()
 
 mkChild :: MonadWidget t m => Dynamic t String -> m (Event t String)
 mkChild d = do
     ev <- el "div" $ do
         dynText d
         button "click me"
-    return (fmap (\_ -> "button") ev)
+    modifiedDynamic <- mapDyn (map toUpper) d
+    return $ tagDyn modifiedDynamic ev
 
 -- main
 main :: IO ()
